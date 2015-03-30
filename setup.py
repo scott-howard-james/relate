@@ -1,12 +1,12 @@
 """Distutils file for relate"""
 
+from setuptools import setup
 from src import __version__
 
 setup(
     name         = 'relate',
     version      = __version__,
     description  = 'Discrete mathematical relation',
-    url          = 'http://vmlaker.github.io/mpipe',
     author       = 'Scott Howard James',
     author_email = 'scott.analysis.james@gmail.com',
     license      = 'MIT',
