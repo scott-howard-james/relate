@@ -9,6 +9,7 @@ setup(
     description  = 'Discrete mathematical relation',
     author       = 'Scott Howard James',
     author_email = 'scott.analysis.james@gmail.com',
+    url='http://github.com/scott-howard-james/relate',
     license      = 'MIT',
     long_description = open('README.rst').read(),
     package_dir  = {'relate' : 'src'},
