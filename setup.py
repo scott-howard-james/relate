@@ -20,6 +20,7 @@ setup(
         'License :: Freeware',
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 2.7',
         'Topic :: Software Development :: Libraries :: Python Modules',
         ],
     )
