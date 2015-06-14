@@ -6,10 +6,10 @@ class RelationError(Exception):
 
 class Relation(MutableMapping):
 
-    RESTRICTIONS = '1:1','1:M','M:1','M:M'
-    INVERTED = {'1:1':'1:1','1:M':'M:1','M:1':'1:M','M:M':'M:M'}
+    CARDINALITIES = '1:1','1:M','M:1','M:N'
+    INVERTED = {'1:1':'1:1','1:M':'M:1','M:1':'1:M','M:N':'M:N'}
 
-    def __init__(self, init=None, restriction='M:M', ordered=False):
+    def __init__(self, init=None, cardinality='M:N', ordered=False):
         if not ordered:
             self.forward = {}
             self.inverse = {}
@@ -17,10 +17,10 @@ class Relation(MutableMapping):
             self.forward = OrderedDict()
             self.inverse = OrderedDict()
 
-        if restriction not in Relation.RESTRICTIONS:
-            raise RelationError('Invalid restriction:' + str(restriction))
+        if cardinality not in Relation.CARDINALITIES:
+            raise RelationError('Invalid cardinality:' + str(cardinality))
         else:
-            self.restriction=restriction
+            self.cardinality=cardinality
 
         if init is not None:
             self.update(init)
@@ -28,9 +28,10 @@ class Relation(MutableMapping):
     def isordered(self):
         return isinstance(self.forward,OrderedDict)
 
+
     def __invert__(self):
         # NOTE: uses references .. not copies
-        new = Relation(restriction=Relation.INVERTED[self.restriction])
+        new = Relation(cardinality=Relation.INVERTED[self.cardinality])
         new.inverse = self.forward
         new.forward = self.inverse
         return new
@@ -58,25 +59,32 @@ class Relation(MutableMapping):
     def __setitem__(self, domain, target):
         # NOTE: unconventional usage: ADD  instead of OVERWRITE
 
-        if self.restriction in ['1:1','M:1']:
-            if domain in self.forward:
-                self._remove_domain(domain)
-        if self.restriction in ['1:1','1:M']:
-            if target in self.inverse:
-                self._remove_range(target)
+        if not isinstance(domain,set):
+            domain = [domain]
+        if not isinstance(target,set):
+            target = [target]
 
-        self.forward.setdefault(domain,set()).add(target)
-        self.inverse.setdefault(target,set()).add(domain)
+        for d in domain:
+            for t in target:
+                if self.cardinality in ['1:1','M:1']:
+                    if d in self.forward:
+                        self._remove_domain(d)
+                if self.cardinality in ['1:1','1:M']:
+                    if t in self.inverse:
+                        self._remove_range(t)
+
+                self.forward.setdefault(d,set()).add(t)
+                self.inverse.setdefault(t,set()).add(d)
 
     def __getitem__(self, domain):
-        if self.restriction in ['1:1','M:1']:
+        if self.cardinality in ['1:1','M:1']:
             for target in self.forward[domain]:
                 return target
         else:
             return self.forward[domain]
 
     def copy(self):
-        r = Relation(restriction=self.restriction, ordered=self.isordered())
+        r = Relation(cardinality=self.cardinality, ordered=self.isordered())
         r.forward.update(self.forward)
         r.inverse.update(self.inverse)
         return r
@@ -100,7 +108,7 @@ class Relation(MutableMapping):
         return '\n'.join(s)
 
     def clear(self):
-        self.__init__(restriction=self.restriction, ordered=self.isordered())
+        self.__init__(cardinality=self.cardinality, ordered=self.isordered())
 
     def __len__(self):
         return len(self.forward)
@@ -118,15 +126,15 @@ class Relation(MutableMapping):
 
 class Isomorphism(Relation):
     def __init__(self, init=None, ordered=False):
-        Relation.__init__(self, init, restriction='1:1', ordered=ordered)
+        Relation.__init__(self, init, cardinality='1:1', ordered=ordered)
 
 class Function(Relation):
     def __init__(self, init=None, ordered=False):
-        Relation.__init__(self, init, restriction='M:1', ordered=ordered)
+        Relation.__init__(self, init, cardinality='M:1', ordered=ordered)
 
 class Partition(Relation):
     def __init__(self, init=None, ordered=False):
-        Relation.__init__(self, init, restriction='1:M', ordered=ordered)
+        Relation.__init__(self, init, cardinality='1:M', ordered=ordered)
 
 # Unit Tests
 
@@ -200,8 +208,8 @@ class Relation_Tests(unittest.TestCase):
         fruit.extend(even_more)
         assert len(fruit) == len(even_more) + len(more) + len(fruits)
 
-    def test_restrictions(self):
-        fruit = Relation(restriction='1:1')
+    def test_CARDINALITIES(self):
+        fruit = Relation(cardinality='1:1')
         fruit['apple']='red'
         fruit['pear']='yellow'
         fruit['apple']='green'
@@ -211,9 +219,7 @@ class Relation_Tests(unittest.TestCase):
         fruit['papya']='green'
         assert 'watermelon' not in fruit
 
-        # NOTE: setting restriction directly; not suggested usage as this can make objects inconsistent.
-
-        fruit.restriction = 'M:1'
+        fruit = Relation(fruit, cardinality='M:1')
         fruit['papya']='green'
         fruit['rasberry']='blue'
         fruit['rasberry']='red'
@@ -222,17 +228,18 @@ class Relation_Tests(unittest.TestCase):
         assert 'rasberry' in fruit
         assert fruit['rasberry'] == 'red'
 
-        fruit.restriction = '1:M'
+        fruit = Relation(fruit, cardinality='1:M')
         fruit['cranberry'] = 'round'
         fruit['lemon'] = 'sour'
         fruit['cranberry'] = 'sour'
         assert 'lemon' not in fruit
         assert len(fruit['cranberry']) > 1
         fruit['pear']='sweet'
+        assert (~fruit)['sweet'] == 'pear'
 
-        fruit.restriction = 'M:M'
+        fruit = Relation(fruit, cardinality='M:N')
         fruit['apple'] = 'sweet'
-        assert len(fruit['apple']) == 1
+        assert len((~fruit)['sweet']) == 2
         fruit['apple'] = 'fruit'
         assert len(fruit['apple']) == 2
 
