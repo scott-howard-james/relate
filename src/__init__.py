@@ -2,4 +2,8 @@
 
 __version__ = '0.2'
 from .relate import Relation
+from .relate import Isomorphism
+from .relate import Function
+from .relate import Partition
+from .relate import Relation_Tests
 
