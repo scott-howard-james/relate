@@ -2,12 +2,34 @@ import unittest
 from collections import OrderedDict, Mapping, MutableMapping
 
 class RelationError(Exception):
+    """
+    Simply a marker to indicate source of exception
+    """
     pass
 
 class Relation(MutableMapping):
+    """
+    Relation() implements a discrete mathematical relation.  A relation a simply a pairing of elements of one set,
+    the domain, with another, the range.  Rephrasing more formally, a relation is a collection of tuples (x,y) where
+    x is in the domain and y is in the range.   A relation, implemented as code, can perform a variety of common tasks:
+
+    - Inversion: quickly find the values(range) associated with a key(domain)
+    - Partitioning: group values into unique buckets
+    - Aliasing: maintain a unique pairing between keys and values
+    - Tagging: associate two sets in an arbitrary manner
+
+    These roughly correspond to the four cardinalities of a relation:
+
+    - Many-to-one (M:1): a function, each range value having possibly multiple values in the domain
+    - One-to-many (1:M): a categorization, where each element in the domain is associated with a unique group of values in the range
+    - One-to-one (1:1): an isomorphism, where each element in the domain is uniquely identified with a single range value
+    - Many-to-many (M:N): an unrestricted pairing of domain and range
+    """
 
     CARDINALITIES = '1:1','1:M','M:1','M:N'
-    INVERTED = {'1:1':'1:1','1:M':'M:1','M:1':'1:M','M:N':'M:N'}
+
+    # map the four cardinalities to their inverted cardinality
+    INVERTED_CARDINALITY = {'1:1':'1:1','1:M':'M:1','M:1':'1:M','M:N':'M:N'}
 
     def __init__(self, init=None, cardinality='M:N', ordered=False):
         if not ordered:
@@ -28,10 +50,12 @@ class Relation(MutableMapping):
     def isordered(self):
         return isinstance(self.forward,OrderedDict)
 
-
     def __invert__(self):
-        # NOTE: uses references .. not copies
-        new = Relation(cardinality=Relation.INVERTED[self.cardinality])
+        """
+        Create a shallow copy of a relation.
+        Changes to inversion will affect original and vice-versa
+        """
+        new = Relation(cardinality=Relation.INVERTED_CARDINALITY[self.cardinality])
         new.inverse = self.forward
         new.forward = self.inverse
         return new
@@ -57,8 +81,13 @@ class Relation(MutableMapping):
         Relation._remove(self.forward,key)
 
     def __setitem__(self, domain, target):
-        # NOTE: unconventional usage: ADD  instead of OVERWRITE
-
+        """
+        Set range for a domain value. Behavior dependent on cardinality:
+        - M:1: assign/overwrite range to for domain, similar to dictionary behavior
+        - 1:1: assign one domain uniquely to one range; remove pairing from other domains
+        - M:N: append range to domain values, append domain to range values
+        - 1:M: append range to domain values.  Remove range from other domains.
+       """
         if not isinstance(domain,set):
             domain = [domain]
         if not isinstance(target,set):
@@ -77,6 +106,13 @@ class Relation(MutableMapping):
                 self.inverse.setdefault(t,set()).add(d)
 
     def __getitem__(self, domain):
+        """
+        Get range for a domain value. Behavior dependent on cardinality
+        - M:1: single value
+        - 1:1: single value
+        - M:N: set of values
+        - 1:M: set of values
+       """
         if self.cardinality in ['1:1','M:1']:
             for target in self.forward[domain]:
                 return target
@@ -84,6 +120,9 @@ class Relation(MutableMapping):
             return self.forward[domain]
 
     def copy(self):
+        """
+        Create one-level copy of a Relation
+        """
         r = Relation(cardinality=self.cardinality, ordered=self.isordered())
         r.forward.update(self.forward)
         r.inverse.update(self.inverse)
@@ -98,13 +137,18 @@ class Relation(MutableMapping):
             return self
 
     def __str__ (self):
+
+        def setstr(x):
+            return '{' + ','.join(x) + '}'
+
         s = []
+        s.append(self.cardinality)
         s.append('->')
         for d in self.forward:
-            s.append(' '.join([str(d),'<',str(self.forward[d])]))
+            s.append(str(d)+':'+setstr(self.forward[d]))
         s.append('<-')
         for t in self.inverse:
-            s.append(' '.join([str(t),'<',str(self.inverse[t])]))
+            s.append(str(t)+':'+setstr(self.inverse[t]))
         return '\n'.join(s)
 
     def clear(self):
@@ -114,9 +158,11 @@ class Relation(MutableMapping):
         return len(self.forward)
 
     def values(self):
+        """ All values in range """
         return self.inverse.keys()
 
     def keys(self):
+        """ All values in domain """
         return self.forward.keys()
 
     def __iter__(self):
